@@ -1,0 +1,36 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs: 
+  scan-and-deploy:
+    runs-on: self-hosted
+
+    steps: 
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Bandit (Python SAST)
+        run: |
+          pip install bandit
+          bandit -r app/ -ll
+      
+      - name: Build container image
+        run: |
+          docker build -t hello-app:latest .
+
+      - name: Run Trivy (container scan)
+        run: |
+          trivy image --exit-code 1 --severity HIGH,CRITICAL hello-app:latest
+
+      - name: Run Checkov (IaC scan)
+        run: |
+          pip install checkov
+          checkov -d k8s/ --framework kubernetes
+
+      - name: Deploy to k3s
+        run: |
+          kubectl apply -f k8s/ 
