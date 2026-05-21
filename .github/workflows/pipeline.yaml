@@ -15,7 +15,7 @@ jobs:
 
       - name: Run Bandit (Python SAST)
         run: |
-          pip install bandit
+          pip install bandit --break-system-packages
           bandit -r app/ -ll
       
       - name: Build container image
@@ -28,7 +28,7 @@ jobs:
 
       - name: Run Checkov (IaC scan)
         run: |
-          pip install checkov
+          pip install checkov --break-system-packages
           checkov -d k8s/ --framework kubernetes
 
       - name: Deploy to k3s
