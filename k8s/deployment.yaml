@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hello-app
+  namespace: hello-app
   labels:
     app: hello-app
 spec:
@@ -13,13 +14,13 @@ spec:
     metadata:
       labels:
         app: hello-app
-      annotations: 
-        seccomp.security.alpha.kubernetes.10/pod: runtime/default
     spec: 
-      autonomousServiceAccountToken: false
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 10000
+        seccompProfile: 
+          type: RuntimeDefault
       containers:
       - name: hello-app
         image: hello-app:latest
