@@ -13,13 +13,38 @@ spec:
     metadata:
       labels:
         app: hello-app
+      annotations: 
+        seccomp.security.alpha.kubernetes.10/pod: runtime/default
     spec: 
+      autonomousServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10000
       containers:
       - name: hello-app
         image: hello-app:latest
         ports:
         - containerPort: 8080
+        securityContext: 
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
         livenessProbe: 
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe: 
           httpGet:
             path: /health
             port: 8080
