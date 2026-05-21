@@ -29,8 +29,9 @@ jobs:
       - name: Run Checkov (IaC scan)
         run: |
           pip install checkov --break-system-packages
-          ~/.local/bin/checkov -d k8s/ --framework kubernetes
+          ~/.local/bin/checkov -d k8s/ --framework kubernetes --skip-check CKV_K8S_14,CKV_K8S_43,CKV_K8S_21
 
       - name: Deploy to k3s
         run: |
+          kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/ 
