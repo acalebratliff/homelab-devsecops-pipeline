@@ -16,7 +16,7 @@ jobs:
       - name: Run Bandit (Python SAST)
         run: |
           pip install bandit --break-system-packages
-          bandit -r app/ -ll
+          ~/.local/bin/bandit -r app/ -ll
       
       - name: Build container image
         run: |
