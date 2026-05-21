@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hello-app
+spec:
+  podSelector:
+    matchLabels:
+      app: hello-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - ports:
+    - port: 8080
+  egress:
+  - {}
