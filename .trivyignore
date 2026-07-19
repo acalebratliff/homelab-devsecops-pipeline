@@ -1,3 +1,0 @@
-# CVE-2025-69720: ncurses buffer overflow in python:3.12-slim base image
-# ncurses is not used by this application - no exploitable attack surface
-CVE-2025-69720
