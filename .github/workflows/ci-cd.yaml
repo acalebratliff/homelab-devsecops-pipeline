@@ -1,0 +1,133 @@
+name: CI/CD Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      lxc_ip:
+        required: true
+        type: string
+      service_name:
+        required: true
+        type: string
+      working_directory:
+        required: true
+        type: string
+      run_tests:
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      DEPLOY_SSH_KEY:
+        required: true
+
+jobs:
+  ci-cd:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python venv
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ci-venv"
+          "$RUNNER_TEMP/ci-venv/bin/pip" install --quiet ruff bandit pip-audit
+
+      - name: Ruff (lint)
+        id: ruff
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          "$RUNNER_TEMP/ci-venv/bin/ruff" check . 2>&1 | tee /tmp/ruff-output.txt
+
+      - name: Notify — Ruff failure
+        if: steps.ruff.outcome == 'failure'
+        run: |
+          curl -s \
+            -H "Title: 🟡 Ruff lint failure — ${{ inputs.service_name }}" \
+            -H "Priority: default" \
+            -H "Tags: warning" \
+            -d "$(head -50 /tmp/ruff-output.txt)" \
+            http://192.168.50.13/pipeline
+
+      - name: Bandit (SAST)
+        id: bandit
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          "$RUNNER_TEMP/ci-venv/bin/bandit" -r . -ll -f txt 2>&1 | tee /tmp/bandit-output.txt
+
+      - name: Notify — Bandit findings
+        if: steps.bandit.outcome == 'failure'
+        run: |
+          curl -s \
+            -H "Title: 🔴 Bandit finding — ${{ inputs.service_name }}" \
+            -H "Priority: high" \
+            -H "Tags: warning,shield" \
+            -d "$(head -50 /tmp/bandit-output.txt)" \
+            http://192.168.50.13/pipeline
+
+      - name: pip-audit (dependency scan)
+        id: pip-audit
+        continue-on-error: true
+        run: |
+          if [ ! -f requirements.txt ]; then
+            echo "No requirements.txt found — skipping pip-audit"
+            exit 0
+          fi
+          set -o pipefail
+          "$RUNNER_TEMP/ci-venv/bin/pip-audit" -r requirements.txt 2>&1 | tee /tmp/pip-audit-output.txt
+
+      - name: Notify — pip-audit findings
+        if: steps.pip-audit.outcome == 'failure'
+        run: |
+          curl -s \
+            -H "Title: 🔴 pip-audit finding — ${{ inputs.service_name }}" \
+            -H "Priority: high" \
+            -H "Tags: warning,package" \
+            -d "$(head -50 /tmp/pip-audit-output.txt)" \
+            http://192.168.50.13/pipeline
+
+      - name: Gate — block deploy if CI failed
+        if: steps.ruff.outcome == 'failure' || steps.bandit.outcome == 'failure' || steps.pip-audit.outcome == 'failure'
+        run: |
+          echo "CI checks failed — deploy blocked"
+          exit 1
+
+      - name: Set up SSH key
+        if: github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Deploy
+        id: deploy
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            deploy@${{ inputs.lxc_ip }} \
+            "sudo git -C ${{ inputs.working_directory }} pull && sudo systemctl restart ${{ inputs.service_name }}"
+
+      - name: Notify — deploy failure
+        if: steps.deploy.outcome == 'failure'
+        run: |
+          curl -s \
+            -H "Title: 🚨 Deploy failed — ${{ inputs.service_name }}" \
+            -H "Priority: urgent" \
+            -H "Tags: rotating_light" \
+            -d "Deploy to ${{ inputs.lxc_ip }} failed. Check GitHub Actions for details." \
+            http://192.168.50.13/pipeline
+
+      - name: Fail if deploy failed
+        if: steps.deploy.outcome == 'failure'
+        run: exit 1
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+          rm -rf "$RUNNER_TEMP/ci-venv"
+          rm -f /tmp/ruff-output.txt /tmp/bandit-output.txt /tmp/pip-audit-output.txt
