@@ -7,8 +7,9 @@ on:
         required: true
         type: string
       service_name:
-        required: true
+        required: false
         type: string
+        default: ""
       working_directory:
         required: true
         type: string
@@ -109,7 +110,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             deploy@${{ inputs.lxc_ip }} \
-            "git -C ${{ inputs.working_directory }} pull && sudo systemctl restart ${{ inputs.service_name }}"
+            "cd ${{ inputs.working_directory }} && git pull && if [ -n '${{ inputs.service_name }}' ]; then sudo systemctl restart ${{ inputs.service_name }}; fi"
 
       - name: Notify — deploy failure
         if: steps.deploy.outcome == 'failure'
