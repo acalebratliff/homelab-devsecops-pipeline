@@ -110,7 +110,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
             deploy@${{ inputs.lxc_ip }} \
-            "cd ${{ inputs.working_directory }} && git pull && if [ -n '${{ inputs.service_name }}' ]; then sudo systemctl restart ${{ inputs.service_name }}; fi"
+            "cd ${{ inputs.working_directory }} && git pull && pip install -r requirements.txt && if [ -n '${{ inputs.service_name }}' ]; then sudo systemctl restart ${{ inputs.service_name }}; fi"
 
       - name: Notify — deploy failure
         if: steps.deploy.outcome == 'failure'
